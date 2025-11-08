@@ -445,12 +445,11 @@ pub const TFLAG_DICTIONARY = TFLAG_TABLE | TFLAG_STRUCT;
 pub const TFLAG_LENGTHABLE = TFLAG_BYTES | TFLAG_INDEXED | TFLAG_DICTIONARY;
 pub const TFLAG_CALLABLE = TFLAG_FUNCTION | TFLAG_CFUNCTION | TFLAG_LENGTHABLE | TFLAG_ABSTRACT;
 
-pub const Janet = blk: {
-    if (JANET_NO_NANBOX or
+const Janet = extern struct {
+    boxed: if (JANET_NO_NANBOX or
         builtin.target.cpu.arch == .arm or
         builtin.target.cpu.arch == .aarch64)
-    {
-        break :blk extern struct {
+        extern struct {
             as: extern union {
                 u64: u64,
                 number: f64,
@@ -459,22 +458,16 @@ pub const Janet = blk: {
                 cpointer: *const anyopaque,
             },
             type: Type,
-
-            pub const Type = JanetType;
-            pub usingnamespace JanetMixin;
-        };
-    } else if (builtin.target.cpu.arch == .x86_64) {
-        break :blk extern union {
+        }
+    else if (builtin.target.cpu.arch == .x86_64)
+        extern union {
             u64: u64,
             i64: i64,
             number: f64,
             pointer: *anyopaque,
-
-            pub const Type = JanetType;
-            pub usingnamespace JanetMixin;
-        };
-    } else if (builtin.target.cpu.arch.endianess() == .Big) {
-        break :blk extern union {
+        }
+    else if (builtin.target.cpu.arch.endianess() == .Big)
+        extern union {
             tagged: extern struct {
                 type: u32,
                 payload: extern union {
@@ -484,12 +477,9 @@ pub const Janet = blk: {
             },
             number: f64,
             u64: u64,
-
-            pub const Type = JanetType;
-            pub usingnamespace JanetMixin;
-        };
-    } else if (builtin.target.cpu.arch.endianess() == .Little) {
-        break :blk extern union {
+        }
+    else if (builtin.target.cpu.arch.endianess() == .Little)
+        extern union {
             tagged: extern struct {
                 payload: extern union {
                     integer: u32,
@@ -499,19 +489,15 @@ pub const Janet = blk: {
             },
             number: f64,
             u64: u64,
+        },
 
-            pub const Type = JanetType;
-            pub usingnamespace JanetMixin;
-        };
-    }
-};
+    pub const Type = JanetType;
 
-const JanetMixin = struct {
     pub fn fromC(janet: c.Janet) Janet {
         return @as(*const Janet, @ptrCast(&janet)).*;
     }
     pub fn toC(janet: *const Janet) c.Janet {
-        return @as(*const c.Janet, @ptrCast(janet)).*;
+        return @as(*const c.Janet, @ptrCast(&janet.boxed)).*;
     }
     pub fn toConstPtr(janet: [*]const Janet) [*c]const c.Janet {
         return @as([*c]const c.Janet, @ptrCast(janet));
@@ -699,6 +685,7 @@ const JanetMixin = struct {
         }
         unreachable;
     }
+
     pub fn unwrapAbstract(janet: Janet, comptime ValueType: type) !Abstract(ValueType) {
         if (!janet.checkType(.abstract)) return error.NotAbstract;
         return Abstract(ValueType).fromC(c.janet_unwrap_abstract(janet.toC()) orelse unreachable);
@@ -1795,7 +1782,7 @@ pub const RNG = extern struct {
 
 test "refAllDecls" {
     testing.refAllDecls(@This());
-    testing.refAllDecls(JanetMixin);
+    testing.refAllDecls(Janet);
     testing.refAllDecls(String);
     testing.refAllDecls(Symbol);
     testing.refAllDecls(Keyword);
