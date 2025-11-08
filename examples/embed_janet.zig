@@ -8,7 +8,7 @@ const std = @import("std");
 const j = @import("jzignet");
 
 // Function with a standard signature which can be imported to Janet.
-fn cfunAddNumbers(argc: i32, argv: [*]const j.Janet) callconv(.C) j.Janet {
+fn cfunAddNumbers(argc: i32, argv: [*]const j.Janet) callconv(.c) j.Janet {
     // Check that the function receives only 2 arguments.
     j.fixArity(argc, 2);
 
