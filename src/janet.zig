@@ -334,8 +334,6 @@ pub fn gcPressure(s: usize) void {
     c.janet_gcpressure(s);
 }
 
-// Waiting for "Allocgate", new model of allocators for Zig. After that we can wrap these
-// into idiomatic Zig allocators.
 pub fn malloc(size: usize) ?*anyopaque {
     return c.janet_malloc(size);
 }
@@ -364,6 +362,82 @@ pub fn sfinalizer(ptr: *anyopaque, finalizer: ScratchFinalizer) void {
 }
 pub fn sfree(ptr: *anyopaque) void {
     c.janet_sfree(ptr);
+}
+
+pub const allocator: std.mem.Allocator = wrapAllocator(malloc, realloc, free);
+pub const scratch_allocator: std.mem.Allocator = wrapAllocator(smalloc, srealloc, sfree);
+
+fn wrapAllocator(
+    comptime alloc_fn: fn (size: usize) ?*anyopaque,
+    comptime realloc_fn: fn (ptr: *anyopaque, size: usize) ?*anyopaque,
+    comptime free_fn: fn (ptr: *anyopaque) void,
+) std.mem.Allocator {
+    // TODO: realloc does not respect alignment, we would need to do something
+    // like what alignedAlloc does, or adapt std.heap.c_allocator's resize.
+    _ = realloc_fn;
+
+    const WrappingAllocator = struct {
+        fn getHeader(ptr: [*]u8) *[*]u8 {
+            return @ptrCast(@alignCast(ptr - @sizeOf(usize)));
+        }
+
+        pub fn alignedAlloc(_: *anyopaque, len: usize, alignment: std.mem.Alignment, _: usize) ?[*]u8 {
+            std.debug.assert(len > 0);
+
+            // Taken from zig's std.heap.c_allocator: janet_malloc does not
+            // support alignment in its API.
+            //
+            // Overallocate to account for alignment padding and store the
+            // original janet_malloc()'ed pointer before the aligned address.
+            const alignment_bytes = alignment.toByteUnits();
+            const total_size: usize = len + alignment_bytes - 1 + @sizeOf(usize);
+            const unaligned_ptr: [*]u8 = @ptrCast(alloc_fn(total_size) orelse return null);
+            const unaligned_addr = @intFromPtr(unaligned_ptr);
+            const aligned_addr = std.mem.alignForward(usize, unaligned_addr + @sizeOf(usize), alignment_bytes);
+            const aligned_ptr = unaligned_ptr + (aligned_addr - unaligned_addr);
+            getHeader(aligned_ptr).* = unaligned_ptr;
+
+            return aligned_ptr;
+        }
+
+        pub fn alignedFree(_: *anyopaque, memory: []u8, _: std.mem.Alignment, _: usize) void {
+            const unaligned_ptr = getHeader(memory.ptr).*;
+            free_fn(unaligned_ptr);
+        }
+    };
+    return .{
+        .ptr = undefined,
+        .vtable = &.{
+            .alloc = &WrappingAllocator.alignedAlloc,
+            .resize = &std.mem.Allocator.noResize,
+            .remap = &std.mem.Allocator.noRemap,
+            .free = &WrappingAllocator.alignedFree,
+        },
+    };
+}
+
+test allocator {
+    try init();
+    defer deinit();
+
+    const data: *[1024]u8 = try allocator.create([1024]u8);
+    defer allocator.destroy(data);
+
+    for (0..data.len) |i| {
+        data[i] = 0xff;
+    }
+}
+
+test scratch_allocator {
+    try init();
+    defer deinit();
+
+    const data: *[1024]u8 = try scratch_allocator.create([1024]u8);
+    defer scratch_allocator.destroy(data);
+
+    for (0..data.len) |i| {
+        data[i] = 0xff;
+    }
 }
 
 pub fn sortedKeys(dict: [*]const KV, cap: i32, index_buffer: *i32) i32 {
