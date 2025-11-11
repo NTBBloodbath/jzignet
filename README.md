@@ -27,7 +27,7 @@ wonderful languages:
   operations on types use methods instead of prefixed global functions.
 
 Currently supported versions:
-* Zig 0.14.1
+* Zig 0.15.2
 * Janet 1.37.1
 
 Repository is available at [sourcehut](https://git.sr.ht/~greenfork/jzignet)
@@ -60,7 +60,7 @@ for this.
    jzignet as a dependency.
 
 ```bash
-zig fetch --save https://github.com/greenfork/jzignet/archive/0.7.6.tar.gz
+zig fetch --save https://github.com/greenfork/jzignet/archive/0.8.0.tar.gz
 ```
 
 2. Add this to `build.zig`.
