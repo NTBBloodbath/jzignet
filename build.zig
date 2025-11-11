@@ -16,12 +16,14 @@ pub fn build(b: *std.Build) void {
     const mod = b.addModule("jzignet", .{
         .root_source_file = b.path("src/janet.zig"),
         .imports = &.{.{ .name = "cjanet", .module = c_header.createModule() }},
-    });
-
-    const lib = b.addStaticLibrary(.{
-        .name = "jzignet",
         .optimize = optimize,
         .target = target,
+    });
+
+    const lib = b.addLibrary(.{
+        .name = "jzignet",
+        .linkage = .static,
+        .root_module = mod,
     });
 
     var janet_flags = std.ArrayList([]const u8).init(ally);
