@@ -519,7 +519,7 @@ pub const TFLAG_DICTIONARY = TFLAG_TABLE | TFLAG_STRUCT;
 pub const TFLAG_LENGTHABLE = TFLAG_BYTES | TFLAG_INDEXED | TFLAG_DICTIONARY;
 pub const TFLAG_CALLABLE = TFLAG_FUNCTION | TFLAG_CFUNCTION | TFLAG_LENGTHABLE | TFLAG_ABSTRACT;
 
-const Janet = extern struct {
+pub const Janet = extern struct {
     boxed: if (JANET_NO_NANBOX or
         builtin.target.cpu.arch == .arm or
         builtin.target.cpu.arch == .aarch64)
